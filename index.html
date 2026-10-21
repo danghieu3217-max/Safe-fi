@@ -899,7 +899,7 @@
         // ================= CHAT CÙNG SAFE AI (GEMINI QUA MÁY CHỦ TRUNG GIAN) =================
         // Sau khi deploy Cloudflare Worker, thay URL bên dưới bằng URL Worker thật.
         // KHÔNG đặt Gemini API key trong file HTML này.
-        const SAFE_AI_API_URL = "PASTE_YOUR_CLOUDFLARE_WORKER_URL_HERE";
+        const SAFE_AI_API_URL = 'https://safeai.danghieu3217.workers.dev/';
         let chatIsSending = false;
 
         function openChatModal() {
@@ -977,17 +977,17 @@
                     const response = await fetch(SAFE_AI_API_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ question })
+                        body: JSON.stringify({ message: question })
                     });
                     let data = {};
                     try { data = await response.json(); } catch (_) {}
                     if (!response.ok) {
                         throw new Error(data.error || 'Máy chủ AI trả về lỗi (' + response.status + ').');
                     }
-                    if (!data.answer || typeof data.answer !== 'string') {
+                    if (!data.reply || typeof data.reply !== 'string') {
                         throw new Error('Máy chủ chưa trả về câu trả lời hợp lệ.');
                     }
-                    pending.bubble.textContent = data.answer;
+                    pending.bubble.textContent = data.reply;
                 } catch (error) {
                     pending.bubble.textContent = 'Mình chưa kết nối được với AI. Hãy kiểm tra mạng, địa chỉ Worker, cấu hình API key và hạn mức API. Chi tiết: ' + (error.message || 'Lỗi kết nối.');
                 }
