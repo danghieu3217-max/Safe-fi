@@ -899,7 +899,7 @@
         // ================= CHAT CÙNG SAFE AI (GEMINI QUA MÁY CHỦ TRUNG GIAN) =================
         // Sau khi deploy Cloudflare Worker, thay URL bên dưới bằng URL Worker thật.
         // KHÔNG đặt Gemini API key trong file HTML này.
-        const SAFE_AI_API_URL = 'https://white-mud-946f.danghieu3217.workers.dev/';
+        const SAFE_AI_API_URL = "https://white-mud-946f.danghieu3217.workers.dev";
         let chatIsSending = false;
 
         function openChatModal() {
@@ -1009,5 +1009,271 @@
         });
 
     </script>
+    // ================= CẤU HÌNH KẾT NỐI AI =================
+// ⚠️ THAY ĐƯỜNG DẪN DƯỚI ĐÂY BẰNG URL WORKER THỰC TẾ CỦA BẠN TRÊN CLOUDFLARE
+const SAFE_AI_API_URL = "https://white-mud-946f.<tên-tài-khoản>.workers.dev"; 
+
+// Biến lưu trạng thái quiz
+let currentQuestionIndex = 0;
+let score = 0;
+
+// Danh sách câu hỏi tình huống mẫu
+const scenarios = [
+    {
+        tag: "HỎA HOẠN TRƯỜNG HỌC",
+        urgency: "Cần phản ứng chính xác",
+        icon: "fa-fire",
+        title: "Phát hiện khói và lửa ở hành lang lớp học",
+        desc: "Trong giờ ra chơi, em ngửi thấy mùi khói khét lẹt và thấy lửa bốc lên ở khu vực cầu thang gần lớp. Đa số học sinh đang hoảng loạn la hét.",
+        options: [
+            { text: "Cố chạy qua ngọn lửa để lấy balo và đồ dùng cá nhân.", correct: false, verdict: "NGUY HIỂM!", reason: "Tài sản không quan trọng bằng mạng sống. Khói độc và lửa có thể cản đường thoát nạn của em ngay lập tức.", guide: "Tuyệt đối không dừng lại lấy đồ. Hạ thấp người, che miệng bằng khăn ẩm và di chuyển theo biển chỉ dẫn thoát hiểm." },
+            { text: "Hô hoán báo động, cúi thấp người, dùng khăn ẩm che miệng và theo lối thoát hiểm ra sân trường.", correct: true, verdict: "XUẤT SẮC!", reason: "Phản xạ cực kỳ chính xác! Hạ thấp người giúp tránh hít phải khí độc tích tụ ở trên cao.", guide: "Luôn giữ bình tĩnh, tuân thủ tuyệt đối hướng dẫn sơ tán của thầy cô giáo." },
+            { text: "Đứng lại lấy điện thoại quay phim đăng lên mạng xã hội.", correct: false, verdict: "RẤT NGUY HIỂM!", reason: "Việc dừng lại quay phim làm chậm trễ thời gian thoát thân và cản trở lối đi của lực lượng cứu hộ.", guide: "Khi có hỏa hoạn, việc cần làm duy nhất là chạy nhanh đến nơi an toàn và báo người lớn." }
+        ]
+    },
+    // Bạn có thể bổ sung thêm các tình huống khác tại đây...
+];
+
+// --- HÀM XỬ LÝ CHAT CÙNG AI ---
+async function sendChatMessage(event) {
+    event.preventDefault();
+    const inputField = document.getElementById("chat-input");
+    const chatMessages = document.getElementById("chat-messages");
+    const sendBtn = document.getElementById("chat-send-btn");
+    
+    const userMessage = inputField.value.trim();
+    if (!userMessage) return;
+
+    // 1. Hiển thị tin nhắn người dùng lên khung chat
+    chatMessages.innerHTML += `
+        <div class="flex items-start justify-end gap-2.5">
+            <div class="chat-bubble-user chat-message max-w-[88%] p-3.5 text-sm leading-relaxed">${escapeHtml(userMessage)}</div>
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white"><i class="fa-solid fa-user"></i></div>
+        </div>
+    `;
+    
+    inputField.value = "";
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    // 2. Hiển thị trạng thái AI đang suy nghĩ
+    const loadingId = "loading-" + Date.now();
+    chatMessages.innerHTML += `
+        <div id="${loadingId}" class="flex items-start gap-2.5">
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-300"><i class="fa-solid fa-robot"></i></div>
+            <div class="chat-bubble-ai chat-message max-w-[88%] p-3.5 text-sm leading-relaxed text-slate-400">SAFE AI đang phân tích tình huống...</div>
+        </div>
+    `;
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    sendBtn.disabled = true;
+
+    try {
+        // 3. Gửi request tới Cloudflare Worker
+        const response = await fetch(SAFE_AI_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt: userMessage })
+        });
+
+        const data = await response.json();
+        document.getElementById(loadingId).remove();
+
+        // 4. Lấy câu trả lời từ AI trả về
+        const botReply = data.reply || data.error || "Xin lỗi, hiện tại tôi chưa thể kết nối tới máy chủ AI.";
+
+        chatMessages.innerHTML += `
+            <div class="flex items-start gap-2.5">
+                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-300"><i class="fa-solid fa-robot"></i></div>
+                <div class="chat-bubble-ai chat-message max-w-[88%] p-3.5 text-sm leading-relaxed">${escapeHtml(botReply)}</div>
+            </div>
+        `;
+    } catch (error) {
+        document.getElementById(loadingId).remove();
+        chatMessages.innerHTML += `
+            <div class="flex items-start gap-2.5">
+                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-300"><i class="fa-solid fa-robot"></i></div>
+                <div class="chat-bubble-ai chat-message max-w-[88%] p-3.5 text-sm leading-relaxed text-red-400">Lỗi kết nối tới máy chủ AI. Vui lòng kiểm tra lại đường dẫn Worker!</div>
+            </div>
+        `;
+    }
+
+    sendBtn.disabled = false;
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Hàm hỗ trợ chống lỗi bảo mật XSS khi hiển thị text
+function escapeHtml(text) {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+// Các hàm điều khiển giao diện Modal và màn hình
+function openChatModal() {
+    document.getElementById("chat-modal").classList.remove("hidden");
+    document.getElementById("chat-modal").classList.add("flex");
+}
+
+function closeChatModal() {
+    document.getElementById("chat-modal").classList.remove("flex");
+    document.getElementById("chat-modal").classList.add("hidden");
+}
+
+function useChatPrompt(text) {
+    document.getElementById("chat-input").value = text;
+    document.getElementById("chat-input").focus();
+}
+
+function openEmergencyModal() {
+    document.getElementById("emergency-modal").classList.remove("hidden");
+}
+
+function closeEmergencyModal() {
+    document.getElementById("emergency-modal").classList.add("hidden");
+}
+
+function goToHome() {
+    document.getElementById("screen-home").classList.remove("hidden");
+    document.getElementById("screen-quiz").classList.add("hidden");
+    document.getElementById("screen-result").classList.add("hidden");
+}
+
+function startChallenge() {
+    document.getElementById("screen-home").classList.add("hidden");
+    document.getElementById("screen-quiz").classList.remove("hidden");
+    document.getElementById("screen-result").classList.add("hidden");
+    currentQuestionIndex = 0;
+    score = 0;
+    loadQuestion();
+}
+
+function loadQuestion() {
+    const q = scenarios[currentQuestionIndex];
+    if (!q) return;
+
+    document.getElementById("quiz-progress-text").innerHTML = `<i class="fa-solid fa-layer-group text-blue-400"></i> Tình huống ${currentQuestionIndex + 1} / ${scenarios.length}`;
+    document.getElementById("current-score").innerText = score;
+    document.getElementById("progress-bar-fill").style.width = `${((currentQuestionIndex + 1) / scenarios.length) * 100}%`;
+
+    document.getElementById("scenario-tag").innerText = q.tag;
+    document.getElementById("scenario-urgency").innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${q.urgency}`;
+    document.getElementById("scenario-icon").className = `fa-solid ${q.icon}`;
+    document.getElementById("scenario-title").innerText = q.title;
+    document.getElementById("scenario-desc").innerText = q.desc;
+
+    const container = document.getElementById("options-container");
+    container.innerHTML = "";
+    document.getElementById("ai-feedback").classList.add("hidden");
+
+    q.options.forEach((opt, idx) => {
+        const btn = document.createElement("button");
+        btn.className = "w-full text-left p-4 sm:p-4.5 rounded-2xl bg-navy-950/80 border border-slate-700/80 hover:border-blue-500 hover:bg-navy-950 text-slate-200 font-bold text-sm sm:text-base transition-all flex items-center justify-between group";
+        btn.innerHTML = `<span><span class="inline-block w-7 h-7 rounded-xl bg-slate-800 text-slate-300 text-center leading-7 mr-2 font-black">${String.fromCharCode(65 + idx)}</span> ${opt.text}</span> <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-blue-400 transition-colors"></i>`;
+        btn.onclick = () => selectOption(opt);
+        container.appendChild(btn);
+    });
+}
+
+function selectOption(opt) {
+    const feedbackBox = document.getElementById("ai-feedback");
+    const verdictEl = document.getElementById("feedback-verdict");
+    const reasonEl = document.getElementById("feedback-reason");
+    const guideEl = document.getElementById("feedback-guide");
+    const iconEl = document.getElementById("feedback-icon");
+
+    feedbackBox.classList.remove("hidden");
+
+    if (opt.correct) {
+        score += 20;
+        document.getElementById("current-score").innerText = score;
+        feedbackBox.className = "mt-6 p-5 sm:p-6 rounded-2xl border bg-emerald-950/40 border-emerald-500/50 transition-all duration-300";
+        iconEl.className = "w-9 h-9 rounded-xl flex items-center justify-center text-white text-lg font-bold bg-emerald-600";
+        iconEl.innerHTML = '<i class="fa-solid fa-check"></i>';
+        verdictEl.className = "text-xl sm:text-2xl font-black tracking-tight text-emerald-400";
+        verdictEl.innerText = opt.verdict;
+    } else {
+        feedbackBox.className = "mt-6 p-5 sm:p-6 rounded-2xl border bg-red-950/40 border-red-500/50 transition-all duration-300";
+        iconEl.className = "w-9 h-9 rounded-xl flex items-center justify-center text-white text-lg font-bold bg-red-600";
+        iconEl.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        verdictEl.className = "text-xl sm:text-2xl font-black tracking-tight text-red-400";
+        verdictEl.innerText = opt.verdict;
+    }
+
+    reasonEl.innerText = opt.reason;
+    guideEl.innerText = opt.guide;
+
+    // Vô hiệu hóa các nút lựa chọn sau khi chọn
+    const buttons = document.getElementById("options-container").getElementsByTagName("button");
+    for (let b of buttons) {
+        b.disabled = true;
+        b.classList.add("opacity-60", "cursor-not-allowed");
+    }
+}
+
+function nextQuestion() {
+    currentQuestionIndex++;
+    if (currentQuestionIndex < scenarios.length) {
+        loadQuestion();
+    } else {
+        showResult();
+    }
+}
+
+function showResult() {
+    document.getElementById("screen-quiz").classList.add("hidden");
+    document.getElementById("screen-result").classList.remove("hidden");
+    document.getElementById("final-score").innerText = score;
+
+    const finalLevel = document.getElementById("final-level");
+    const resultRank = document.getElementById("result-rank");
+
+    if (score >= 80) {
+        finalLevel.innerText = "Xuất Sắc";
+        finalLevel.className = "text-2xl sm:text-3xl font-extrabold text-emerald-400";
+        resultRank.innerText = "Huy Hiệu: Dũng Sĩ An Toàn Hạng Nhất";
+    } else if (score >= 50) {
+        finalLevel.innerText = "Khá Tốt";
+        finalLevel.className = "text-2xl sm:text-3xl font-extrabold text-amber-400";
+        resultRank.innerText = "Huy Hiệu: Tập Sự An Toàn";
+    } else {
+        finalLevel.innerText = "Cần Ôn Lại";
+        finalLevel.className = "text-2xl sm:text-3xl font-extrabold text-red-400";
+        resultRank.innerText = "Cần trang bị thêm kiến thức sinh tồn";
+    }
+}
+
+// Xử lý âm thanh còi hú SOS (Web Audio API)
+let audioCtx = null;
+let sirenInterval = null;
+
+function toggleSiren() {
+    const btnText = document.getElementById("siren-status-text");
+    if (sirenInterval) {
+        // Tắt còi
+        clearInterval(sirenInterval);
+        sirenInterval = null;
+        if (audioCtx) audioCtx.close();
+        audioCtx = null;
+        btnText.innerText = "Bật còi hú SOS";
+        document.getElementById("btn-siren").className = "w-full sm:w-auto px-5 py-2.5 bg-alertRed-600 hover:bg-alertRed-500 text-white font-extrabold rounded-xl text-sm shrink-0 flex items-center justify-center gap-2 shadow-lg";
+    } else {
+        // Bật còi hú
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let high = true;
+        sirenInterval = setInterval(() => {
+            if (!audioCtx) return;
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.type = "sawtooth";
+            osc.frequency.setValueAtTime(high ? 880 : 587.33, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.3);
+            high = !high;
+        }, 350);
+
+        btnText.innerText = "Tắt còi hú";
+        document.getElementById("btn-siren").className = "w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-xl text-sm shrink-0 flex items-center justify-center gap-2 shadow-lg animate-pulse";
+    }
+}
 </body>
 </html>
